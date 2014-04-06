@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
+	"time"
 )
 
 var example = []byte(`ID,NAME,ABBREV,POPULATION,GDP (trillions),FOUNDED,FREEDOM?
-2,"United States","US",317808000,17.438,1776-07-04 00:00:00,true
-3,"Canada","CA",35344962,1.518,1867-07-01 00:00:00,false`)
+2,"United States","US",317808000,17.438,1776-07-04T00:00:00Z,true
+3,"Canada","CA",35344962,1.518,1867-07-01T00:00:00Z,false`)
 
 type country struct {
 	Id         int64
@@ -16,7 +17,7 @@ type country struct {
 	Abbrev     string
 	Population int64
 	GDP        float64
-	Founded    string
+	Founded    time.Time
 	Freedom    bool
 }
 
@@ -33,6 +34,12 @@ func expectString(t *testing.T, a, b string) {
 func expectInt64(t *testing.T, a, b int64) {
 	if a != b {
 		t.Errorf("Unexpected integer: %d != %d", a, b)
+	}
+}
+
+func expectDate(t *testing.T, a, b time.Time) {
+	if a != b {
+		t.Errorf("Unexpected date: %s != %s", a, b)
 	}
 }
 
@@ -64,6 +71,12 @@ func TestReader_Unmarshal(t *testing.T) {
 	expectString(t, c.Name, "United States")
 	expectString(t, c.Abbrev, "US")
 	expectInt64(t, c.Id, 2)
+
+	july4 := time.Date(1776, time.Month(7), 4, 0, 0, 0, 0, time.UTC)
+	expectDate(t, c.Founded, july4)
+	if !c.Freedom {
+		t.Errorf("Unexpected boolean: false != true")
+	}
 
 	c = countries[1]
 	expectString(t, c.Name, "Canada")

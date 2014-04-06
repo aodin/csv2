@@ -6,6 +6,7 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"time"
 )
 
 type Reader struct {
@@ -73,6 +74,7 @@ func setValue(values []string, elem *reflect.Value) error {
 			return fmt.Errorf("Field %d cannot be set", i)
 		}
 
+		// TODO What about using a type switch instead?
 		switch f.Kind() {
 		case reflect.String:
 			f.SetString(values[i])
@@ -100,6 +102,19 @@ func setValue(values []string, elem *reflect.Value) error {
 				return err
 			}
 			f.SetBool(v)
+		case reflect.Struct:
+			switch f.Interface().(type) {
+			case time.Time:
+				// TODO Allow the layout to be set by the unmarshaler
+				parsed, err := time.Parse(time.RFC3339, values[i])
+				if err != nil {
+					// TODO wrap with the current field
+					return err
+				}
+				f.Set(reflect.ValueOf(parsed))
+			default:
+				return fmt.Errorf("unknown struct")
+			}
 		default:
 			return fmt.Errorf("unknown type: %s", f.Kind())
 		}
