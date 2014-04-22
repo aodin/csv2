@@ -52,6 +52,13 @@ func main() {
 }
 ```
 
+Supported field types for destination structs include:
+* `string`
+* `int64`
+* `float64`
+* `bool`
+* `time.Time`
+
 By default, `time.Time` fields will be parsed with the `RFC3339` layout. Alternative layouts can be specified by adding a `csv` tag to the field:
 
 ```go
