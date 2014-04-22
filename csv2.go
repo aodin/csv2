@@ -11,6 +11,20 @@ import (
 
 type Reader struct {
 	*csv.Reader
+	layouts map[int]string
+}
+
+func (r *Reader) setLayouts(v reflect.Type) {
+	r.layouts = make(map[int]string)
+
+	// TODO Only needs to be done for time.Time fields
+	for i := 0; i < v.NumField(); i += 1 {
+		f := v.Field(i)
+		tag := f.Tag.Get("csv")
+		if tag != "" {
+			r.layouts[i] = tag
+		}
+	}
 }
 
 func (r *Reader) Unmarshal(i interface{}) error {
@@ -18,13 +32,11 @@ func (r *Reader) Unmarshal(i interface{}) error {
 	// The destination interface must of type slice
 	sliceValue := reflect.ValueOf(i).Elem()
 
-	// New struct
-	// if v.Kind() == reflect.Ptr {
-	//     v = v.Elem()
-	// }
-
 	// Get the type of the slice element
 	elem := sliceValue.Type().Elem()
+
+	// Check the struct tags for any layouts
+	r.setLayouts(elem)
 
 	// Read all
 	for {
@@ -40,7 +52,7 @@ func (r *Reader) Unmarshal(i interface{}) error {
 		n := reflect.New(elem)
 		newElem := n.Elem()
 
-		err = setValue(record, &newElem)
+		err = r.setValue(record, &newElem)
 		if err != nil {
 			return err
 		}
@@ -63,11 +75,17 @@ func (r *Reader) UnmarshalOne(i interface{}) error {
 	// TODO Will indirect work or must the function be passed a pointer?
 	elem := reflect.Indirect(value)
 
-	return setValue(record, &elem)
+	t := reflect.TypeOf(i)
+	if t.Kind() != reflect.Ptr {
+		t = reflect.PtrTo(t)
+	}
+	r.setLayouts(t.Elem())
+
+	return r.setValue(record, &elem)
 }
 
 // TODO How to persist the destination schema, with tags, etc...
-func setValue(values []string, elem *reflect.Value) error {
+func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 	for i := 0; i < elem.NumField(); i += 1 {
 		f := elem.Field(i)
 		if !f.IsValid() || !f.CanSet() {
@@ -105,8 +123,13 @@ func setValue(values []string, elem *reflect.Value) error {
 		case reflect.Struct:
 			switch f.Interface().(type) {
 			case time.Time:
-				// TODO Allow the layout to be set by the unmarshaler
-				parsed, err := time.Parse(time.RFC3339, values[i])
+				// Check if an alternative layout should be used
+				layout := r.layouts[i]
+				if layout == "" {
+					layout = time.RFC3339
+				}
+				parsed, err := time.Parse(layout, values[i])
+
 				if err != nil {
 					// TODO wrap with the current field
 					return err
@@ -123,5 +146,5 @@ func setValue(values []string, elem *reflect.Value) error {
 }
 
 func NewReader(r io.Reader) *Reader {
-	return &Reader{csv.NewReader(r)}
+	return &Reader{Reader: csv.NewReader(r)}
 }

@@ -3,6 +3,7 @@ package csv
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -25,6 +26,19 @@ func (c country) String() string {
 	return fmt.Sprintf("%s, %s, (%d)", c.Name, c.Abbrev, c.Id)
 }
 
+var exampleHolidays = []byte(`Fourth of July,Jul 4
+Halloween,Oct 31
+Thanksgiving,Nov 27`)
+
+type holiday struct {
+	Name string
+	Day  time.Time `csv:"Jan _2"`
+}
+
+func (h holiday) String() string {
+	return fmt.Sprintf("%s (%s)", h.Name, h.Day.Format("01-02"))
+}
+
 func expectString(t *testing.T, a, b string) {
 	if a != b {
 		t.Errorf("Unexpected string: %s != %s", a, b)
@@ -41,6 +55,36 @@ func expectDate(t *testing.T, a, b time.Time) {
 	if a != b {
 		t.Errorf("Unexpected date: %s != %s", a, b)
 	}
+}
+
+func TestReader_setLayouts(t *testing.T) {
+	b := bytes.NewBuffer(exampleHolidays)
+
+	r := NewReader(b)
+
+	var h holiday
+
+	// Set the layouts
+	typ := reflect.TypeOf(h)
+	if typ.Kind() != reflect.Ptr {
+		typ = reflect.PtrTo(typ)
+	}
+	r.setLayouts(typ.Elem())
+	if len(r.layouts) != 1 {
+		t.Fatalf("Unexpected length of layouts: %d != 1", len(r.layouts))
+	}
+	expectString(t, r.layouts[1], "Jan _2")
+
+	// Also try with an array
+	var holidays []holiday
+	err := r.Unmarshal(&holidays)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(holidays) != 3 {
+		t.Fatalf("Unexpected length of holidays: %d != 2", len(holidays))
+	}
+	expectString(t, holidays[0].String(), "Fourth of July (07-04)")
 }
 
 func TestReader_Unmarshal(t *testing.T) {
