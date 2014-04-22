@@ -58,9 +58,8 @@ func expectDate(t *testing.T, a, b time.Time) {
 }
 
 func TestReader_setLayouts(t *testing.T) {
-	b := bytes.NewBuffer(exampleHolidays)
-
-	r := NewReader(b)
+	// Create a buffer with CSV format and a new csv2 reader
+	r := NewReader(bytes.NewBuffer(exampleHolidays))
 
 	var h holiday
 
@@ -88,11 +87,8 @@ func TestReader_setLayouts(t *testing.T) {
 }
 
 func TestReader_Unmarshal(t *testing.T) {
-	// Create a buffer with CSV format
-	b := bytes.NewBuffer(example)
-
-	// Create the csv2 reader
-	r := NewReader(b)
+	// Create a buffer with CSV format and a new csv2 reader
+	r := NewReader(bytes.NewBuffer(example))
 
 	// Get rid of the header
 	_, err := r.Read()
@@ -126,14 +122,26 @@ func TestReader_Unmarshal(t *testing.T) {
 	expectString(t, c.Name, "Canada")
 	expectString(t, c.Abbrev, "CA")
 	expectInt64(t, c.Id, 3)
+
+	// Pass some bad destinations
+	r = NewReader(bytes.NewBuffer(example))
+
+	// Not a pointer
+	var cs []country
+	if r.Unmarshal(cs) != ErrNotPointer {
+		t.Error("Did not receive a non-pointer error during Unmarshal")
+	}
+
+	// Not a slice
+	var cx country
+	if r.Unmarshal(&cx) != ErrNotSlice {
+		t.Fatal("Did not receive a non-slice error during Unmarshal")
+	}
 }
 
 func TestReader_UnmarshalOne(t *testing.T) {
-	// Create a buffer with CSV format
-	b := bytes.NewBuffer(example)
-
-	// Create the csv2 reader
-	r := NewReader(b)
+	// Create a buffer with CSV format and a new csv2 reader
+	r := NewReader(bytes.NewBuffer(example))
 
 	// Get rid of the header
 	_, err := r.Read()
@@ -151,4 +159,18 @@ func TestReader_UnmarshalOne(t *testing.T) {
 	expectString(t, c.Name, "United States")
 	expectString(t, c.Abbrev, "US")
 	expectInt64(t, c.Id, 2)
+
+	// Pass some bad destinations
+	r = NewReader(bytes.NewBuffer(example))
+
+	// Not a pointer
+	if r.UnmarshalOne(c) != ErrNotPointer {
+		t.Error("Did not receive a non-pointer error during UnmarshalOne")
+	}
+
+	// Not a struct
+	var i int
+	if r.UnmarshalOne(&i) != ErrNotStruct {
+		t.Fatal("Did not receive a non-struct error during UnmarshalOne	")
+	}
 }

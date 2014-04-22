@@ -51,3 +51,14 @@ func main() {
     fmt.Println(countries)
 }
 ```
+
+By default, `time.Time` fields will be parsed with the `RFC3339` layout. Alternative layouts can be specified by adding a `csv` tag to the field:
+
+```go
+type holiday struct {
+    Name string
+    Day  time.Time `csv:"Jan _2"`
+}
+```
+
+aodin, 2014

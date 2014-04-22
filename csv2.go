@@ -2,6 +2,7 @@ package csv
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -9,15 +10,21 @@ import (
 	"time"
 )
 
+var (
+	ErrNotPointer = errors.New("csv2: destination must be a pointer")
+	ErrNotSlice   = errors.New("csv2: destination must be a slice")
+	ErrNotStruct  = errors.New("csv2: destination must be a struct")
+)
+
 type Reader struct {
 	*csv.Reader
 	layouts map[int]string
 }
 
+// Check the given struct type for any "csv" tags.
+// These layouts are used for alternative parse formats.
 func (r *Reader) setLayouts(v reflect.Type) {
 	r.layouts = make(map[int]string)
-
-	// TODO Only needs to be done for time.Time fields
 	for i := 0; i < v.NumField(); i += 1 {
 		f := v.Field(i)
 		tag := f.Tag.Get("csv")
@@ -27,10 +34,18 @@ func (r *Reader) setLayouts(v reflect.Type) {
 	}
 }
 
+// Unmarshal the entire Reader into the given destination.
+// The destination interface must of pointer of type slice.
 func (r *Reader) Unmarshal(i interface{}) error {
-	// TODO Error checking
-	// The destination interface must of type slice
-	sliceValue := reflect.ValueOf(i).Elem()
+	sv := reflect.ValueOf(i)
+	if sv.Kind() != reflect.Ptr {
+		return ErrNotPointer
+	}
+
+	sliceValue := sv.Elem()
+	if sliceValue.Kind() != reflect.Slice {
+		return ErrNotSlice
+	}
 
 	// Get the type of the slice element
 	elem := sliceValue.Type().Elem()
@@ -62,37 +77,43 @@ func (r *Reader) Unmarshal(i interface{}) error {
 	return nil
 }
 
+// Unmarshal a single row of the Reader into the given struct.
+// The destination interface must of pointer of type struct.
 func (r *Reader) UnmarshalOne(i interface{}) error {
+	// Get the value of the given interface
+	value := reflect.ValueOf(i)
+	if value.Kind() != reflect.Ptr {
+		return ErrNotPointer
+	}
+
+	elem := value.Elem()
+	if elem.Kind() != reflect.Struct {
+		return ErrNotStruct
+	}
+
 	// Get the next record from the reader
 	record, err := r.Read()
 	if err != nil {
 		return err
 	}
 
-	// Get the value of the given interface
-	value := reflect.ValueOf(i)
-
-	// TODO Will indirect work or must the function be passed a pointer?
-	elem := reflect.Indirect(value)
-
+	// Get the type of the interface to check for layouts
 	t := reflect.TypeOf(i)
-	if t.Kind() != reflect.Ptr {
-		t = reflect.PtrTo(t)
-	}
 	r.setLayouts(t.Elem())
-
 	return r.setValue(record, &elem)
 }
 
-// TODO How to persist the destination schema, with tags, etc...
+// Set the values of the given struct with the reflect package.
+// Fields are processed in
 func (r *Reader) setValue(values []string, elem *reflect.Value) error {
+	// TODO wrap the errors with the current field
 	for i := 0; i < elem.NumField(); i += 1 {
 		f := elem.Field(i)
 		if !f.IsValid() || !f.CanSet() {
-			return fmt.Errorf("Field %d cannot be set", i)
+			return fmt.Errorf("csv2: field %d cannot be set", i)
 		}
 
-		// TODO What about using a type switch instead?
+		// TODO What about using a type switch instead? benchmark it.
 		switch f.Kind() {
 		case reflect.String:
 			f.SetString(values[i])
@@ -100,7 +121,6 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 			// Attempt to convert the value to an int64
 			v, err := strconv.ParseInt(values[i], 10, 64)
 			if err != nil {
-				// TODO wrap with the current field
 				return err
 			}
 			f.SetInt(v)
@@ -108,7 +128,6 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 			// Attempt to convert the value to a float64
 			v, err := strconv.ParseFloat(values[i], 64)
 			if err != nil {
-				// TODO wrap with the current field
 				return err
 			}
 			f.SetFloat(v)
@@ -116,7 +135,6 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 			// Attempt to convert the value to a boolean
 			v, err := strconv.ParseBool(values[i])
 			if err != nil {
-				// TODO wrap with the current field
 				return err
 			}
 			f.SetBool(v)
@@ -131,15 +149,21 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 				parsed, err := time.Parse(layout, values[i])
 
 				if err != nil {
-					// TODO wrap with the current field
 					return err
 				}
 				f.Set(reflect.ValueOf(parsed))
 			default:
-				return fmt.Errorf("unknown struct")
+				return fmt.Errorf(
+					"csv2: unknown destination struct for field %d",
+					i,
+				)
 			}
 		default:
-			return fmt.Errorf("unknown type: %s", f.Kind())
+			return fmt.Errorf(
+				"csv2: unsupported type %s for field %d",
+				f.Kind(),
+				i,
+			)
 		}
 	}
 	return nil
