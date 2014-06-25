@@ -67,6 +67,74 @@ func expectDate(t *testing.T, a, b time.Time) {
 	}
 }
 
+func expectStringArray(t *testing.T, a, b []string) {
+	if len(a) != len(b) {
+		t.Errorf("Unequal lengths of string arrays: %d != %d", len(a), len(b))
+		return
+	}
+	for i, elem := range a {
+		if elem != b[i] {
+			t.Errorf("Unequal string element at %d: %s != %s", i, elem, b[i])
+		}
+	}
+}
+
+func TestGetFieldNames(t *testing.T) {
+	expected := []string{
+		"Id",
+		"Name",
+		"Abbrev",
+		"Population",
+		"GDP",
+		"Founded",
+		"Freedom",
+	}
+	var output []string
+	var err error
+
+	// struct
+	output, err = GetFieldNames(country{})
+	if err != nil {
+		t.Errorf("Error during GetFieldNames of struct: %s", err)
+	}
+	expectStringArray(t, output, expected)
+
+	// struct pointer
+	output, err = GetFieldNames(&country{})
+	if err != nil {
+		t.Errorf("Error during GetFieldNames of struct pointer: %s", err)
+	}
+	expectStringArray(t, output, expected)
+
+	// slice
+	output, err = GetFieldNames([]country{})
+	if err != nil {
+		t.Errorf("Error during GetFieldNames of slice: %s", err)
+	}
+	expectStringArray(t, output, expected)
+
+	// pointer to slice
+	output, err = GetFieldNames(&[]country{})
+	if err != nil {
+		t.Errorf("Error during GetFieldNames of pointer to slice: %s", err)
+	}
+	expectStringArray(t, output, expected)
+
+	// slice of pointers
+	output, err = GetFieldNames([]*country{})
+	if err != nil {
+		t.Errorf("Error during GetFieldNames of slice of struct pointers: %s", err)
+	}
+	expectStringArray(t, output, expected)
+
+	// slice of pointers
+	output, err = GetFieldNames(&[]*country{})
+	if err != nil {
+		t.Errorf("Error during GetFieldNames of pointer to slice of struct pointers: %s", err)
+	}
+	expectStringArray(t, output, expected)
+}
+
 func TestSetLayout(t *testing.T) {
 	// Create a buffer with CSV format and a new csv2 reader
 	r := NewReader(bytes.NewBuffer(exampleHolidays))
@@ -187,15 +255,19 @@ func TestReader_UnmarshalOne(t *testing.T) {
 
 func TestWriter_Marshal(t *testing.T) {
 	// Create a buffer with CSV format and a new csv2 writer
+	var err error
 	var b bytes.Buffer
-	r := NewWriter(&b)
+	var w *Writer
+	w = NewWriter(&b)
 
 	// Marshal the countries array
-	err := r.Marshal(&typedCountries)
+	err = w.Marshal(&typedCountries)
 	if err != nil {
 		t.Fatalf("Error during Writer.Marshal: %s", err)
 	}
 	if b.String() != expectedCountries {
 		t.Errorf("Unexpected string output of writer: %s", b.String())
 	}
+
+	// Reset the buffer and Writer
 }

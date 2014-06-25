@@ -11,10 +11,40 @@ import (
 )
 
 var (
-	ErrNotPointer = errors.New("csv2: destination must be a pointer")
-	ErrNotSlice   = errors.New("csv2: destination must be a slice")
-	ErrNotStruct  = errors.New("csv2: destination must be a struct")
+	ErrNotPointer = errors.New("csv2: non-pointer receiver")
+	ErrNotSlice   = errors.New("csv2: receiver must be a slice of structs")
+	ErrNotStruct  = errors.New("csv2: receiver must be a struct")
+	ErrUnwritable = errors.New("csv2: writers accept struct or struct slices")
 )
+
+// GetFieldNames returns a string array of the given interface's field names
+// if the given interface is a struct or slice of structs
+func GetFieldNames(i interface{}) ([]string, error) {
+	// Given interface must be a struct or a slice of structs
+	// TODO Pointers!?
+	value := reflect.Indirect(reflect.ValueOf(i))
+	var elem reflect.Type
+	switch value.Kind() {
+	case reflect.Struct:
+		elem = value.Type()
+	case reflect.Slice:
+		elem = value.Type().Elem()
+		if elem.Kind() == reflect.Ptr {
+			elem = elem.Elem()
+		}
+		if elem.Kind() != reflect.Struct {
+			return nil, ErrUnwritable
+		}
+	default:
+		return nil, ErrUnwritable
+	}
+	// Get the names of the struct fields
+	fields := make([]string, elem.NumField())
+	for index := 0; index < elem.NumField(); index += 1 {
+		fields[index] = elem.Field(index).Name
+	}
+	return fields, nil
+}
 
 // setLayout checks the given struct type for any "csv" tags.
 // This layout is used for alternative parse formats.
@@ -51,6 +81,9 @@ func (r *Reader) Unmarshal(i interface{}) error {
 
 	// Get the type of the slice element
 	elem := sliceValue.Type().Elem()
+	if elem.Kind() != reflect.Struct {
+		return ErrNotSlice
+	}
 
 	// Check the struct tags for any custom csv layout tags
 	// TODO Check if already set?
@@ -181,6 +214,19 @@ func NewReader(r io.Reader) *Reader {
 type Writer struct {
 	*csv.Writer
 	layout map[int]string
+}
+
+// WriteHeader will write the names of the underlying struct fields as a row.
+// It accepts a struct or a slice of structs
+func (w *Writer) WriteHeader(i interface{}) error {
+	headers, err := GetFieldNames(i)
+	if err != nil {
+		return err
+	}
+	if err = w.Write(headers); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (w *Writer) getStrings(elem reflect.Value) ([]string, error) {
