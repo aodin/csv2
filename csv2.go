@@ -30,6 +30,7 @@ func setLayout(v reflect.Type) map[int]string {
 	return layout
 }
 
+// Reader wraps the csv.Reader and adds a map of csv struct tags
 type Reader struct {
 	*csv.Reader
 	layout map[int]string
@@ -171,6 +172,100 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 	return nil
 }
 
+// NewReader returns a new csv2 Reader by wrapping a csv.Reader
 func NewReader(r io.Reader) *Reader {
 	return &Reader{Reader: csv.NewReader(r)}
+}
+
+// Writer wraps the csv.Writer and adds a map of csv struct tags.
+type Writer struct {
+	*csv.Writer
+	layout map[int]string
+}
+
+func (w *Writer) getStrings(elem reflect.Value) ([]string, error) {
+	output := make([]string, elem.NumField())
+	for i := 0; i < elem.NumField(); i += 1 {
+		f := elem.Field(i)
+
+		// TODO What about using a type switch instead? benchmark it.
+		switch f.Kind() {
+		case reflect.String:
+			output[i] = f.String()
+		case reflect.Int64:
+			// TODO additional base output
+			output[i] = strconv.FormatInt(f.Int(), 10)
+		case reflect.Float64:
+			// TODO additional formats, precision
+			output[i] = strconv.FormatFloat(f.Float(), 'f', -1, 64)
+		case reflect.Bool:
+			// Attempt to convert the value to a boolean
+			output[i] = strconv.FormatBool(f.Bool())
+		case reflect.Struct:
+			switch f.Interface().(type) {
+			case time.Time:
+				// Get the underlying time
+				t := f.Interface().(time.Time)
+
+				// Check if an alternative layout should be used
+				layout := w.layout[i]
+				if layout == "" {
+					layout = time.RFC3339
+				}
+				output[i] = t.Format(layout)
+			default:
+				return output, fmt.Errorf(
+					"csv2: unsupported struct for field %d",
+					i,
+				)
+			}
+		default:
+			return output, fmt.Errorf(
+				"csv2: unsupported type %s for field %d",
+				f.Kind(),
+				i,
+			)
+		}
+	}
+	return output, nil
+}
+
+// Marshal writes a slice of structs to the Writer.
+// The destination interface must of pointer of type slice.
+func (w *Writer) Marshal(i interface{}) error {
+	sv := reflect.ValueOf(i)
+	if sv.Kind() != reflect.Ptr {
+		return ErrNotPointer
+	}
+
+	sliceValue := sv.Elem()
+	if sliceValue.Kind() != reflect.Slice {
+		return ErrNotSlice
+	}
+
+	// Get the type of the slice element
+	elem := sliceValue.Type().Elem()
+
+	// Check the struct tags for any custom csv layout tags
+	w.layout = setLayout(elem)
+
+	// Read all
+	for index := 0; index < sliceValue.Len(); index += 1 {
+		s, err := w.getStrings(sliceValue.Index(index))
+		if err != nil {
+			return err
+		}
+		if err = w.Write(s); err != nil {
+			return err
+		}
+	}
+
+	// csv writer is buffered
+	w.Flush()
+	return nil
+}
+
+// NewWriter returns a new csv2 Writer by wrapping a csv.Writer
+func NewWriter(r io.Writer) *Writer {
+	return &Writer{Writer: csv.NewWriter(r)}
 }

@@ -22,6 +22,16 @@ type country struct {
 	Freedom    bool
 }
 
+var typedCountries = []country{
+	{2, "United States", "US", 317808000, 17.438, time.Date(1776, 7, 4, 0, 0, 0, 0, time.UTC), true},
+	{3, "Canada", "CA", 35344962, 1.518, time.Date(1867, 7, 1, 0, 0, 0, 0, time.UTC), false},
+}
+
+// Writer ends with a newline
+var expectedCountries = `2,United States,US,317808000,17.438,1776-07-04T00:00:00Z,true
+3,Canada,CA,35344962,1.518,1867-07-01T00:00:00Z,false
+`
+
 func (c country) String() string {
 	return fmt.Sprintf("%s, %s, (%d)", c.Name, c.Abbrev, c.Id)
 }
@@ -57,7 +67,7 @@ func expectDate(t *testing.T, a, b time.Time) {
 	}
 }
 
-func TestReader_setLayouts(t *testing.T) {
+func TestSetLayout(t *testing.T) {
 	// Create a buffer with CSV format and a new csv2 reader
 	r := NewReader(bytes.NewBuffer(exampleHolidays))
 
@@ -171,6 +181,21 @@ func TestReader_UnmarshalOne(t *testing.T) {
 	// Not a struct
 	var i int
 	if r.UnmarshalOne(&i) != ErrNotStruct {
-		t.Fatal("Did not receive a non-struct error during UnmarshalOne	")
+		t.Fatal("Did not receive a non-struct error during UnmarshalOne")
+	}
+}
+
+func TestWriter_Marshal(t *testing.T) {
+	// Create a buffer with CSV format and a new csv2 writer
+	var b bytes.Buffer
+	r := NewWriter(&b)
+
+	// Marshal the countries array
+	err := r.Marshal(&typedCountries)
+	if err != nil {
+		t.Fatalf("Error during Writer.Marshal: %s", err)
+	}
+	if b.String() != expectedCountries {
+		t.Errorf("Unexpected string output of writer: %s", b.String())
 	}
 }
