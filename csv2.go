@@ -16,25 +16,26 @@ var (
 	ErrNotStruct  = errors.New("csv2: destination must be a struct")
 )
 
-type Reader struct {
-	*csv.Reader
-	layouts map[int]string
-}
-
-// Check the given struct type for any "csv" tags.
-// These layouts are used for alternative parse formats.
-func (r *Reader) setLayouts(v reflect.Type) {
-	r.layouts = make(map[int]string)
+// setLayout checks the given struct type for any "csv" tags.
+// This layout is used for alternative parse formats.
+func setLayout(v reflect.Type) map[int]string {
+	layout := make(map[int]string)
 	for i := 0; i < v.NumField(); i += 1 {
 		f := v.Field(i)
 		tag := f.Tag.Get("csv")
 		if tag != "" {
-			r.layouts[i] = tag
+			layout[i] = tag
 		}
 	}
+	return layout
 }
 
-// Unmarshal the entire Reader into the given destination.
+type Reader struct {
+	*csv.Reader
+	layout map[int]string
+}
+
+// Unmarshal reads the entire Reader into the given destination.
 // The destination interface must of pointer of type slice.
 func (r *Reader) Unmarshal(i interface{}) error {
 	sv := reflect.ValueOf(i)
@@ -50,8 +51,9 @@ func (r *Reader) Unmarshal(i interface{}) error {
 	// Get the type of the slice element
 	elem := sliceValue.Type().Elem()
 
-	// Check the struct tags for any layouts
-	r.setLayouts(elem)
+	// Check the struct tags for any custom csv layout tags
+	// TODO Check if already set?
+	r.layout = setLayout(elem)
 
 	// Read all
 	for {
@@ -77,7 +79,7 @@ func (r *Reader) Unmarshal(i interface{}) error {
 	return nil
 }
 
-// Unmarshal a single row of the Reader into the given struct.
+// UnmarshalOne rads a single row of the Reader into the given struct.
 // The destination interface must of pointer of type struct.
 func (r *Reader) UnmarshalOne(i interface{}) error {
 	// Get the value of the given interface
@@ -99,7 +101,7 @@ func (r *Reader) UnmarshalOne(i interface{}) error {
 
 	// Get the type of the interface to check for layouts
 	t := reflect.TypeOf(i)
-	r.setLayouts(t.Elem())
+	r.layout = setLayout(t.Elem())
 	return r.setValue(record, &elem)
 }
 
@@ -142,7 +144,7 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 			switch f.Interface().(type) {
 			case time.Time:
 				// Check if an alternative layout should be used
-				layout := r.layouts[i]
+				layout := r.layout[i]
 				if layout == "" {
 					layout = time.RFC3339
 				}

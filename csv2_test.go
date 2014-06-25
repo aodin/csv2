@@ -68,11 +68,11 @@ func TestReader_setLayouts(t *testing.T) {
 	if typ.Kind() != reflect.Ptr {
 		typ = reflect.PtrTo(typ)
 	}
-	r.setLayouts(typ.Elem())
-	if len(r.layouts) != 1 {
-		t.Fatalf("Unexpected length of layouts: %d != 1", len(r.layouts))
+	layout := setLayout(typ.Elem())
+	if len(layout) != 1 {
+		t.Fatalf("Unexpected length of layouts: %d != 1", len(r.layout))
 	}
-	expectString(t, r.layouts[1], "Jan _2")
+	expectString(t, layout[1], "Jan _2")
 
 	// Also try with an array
 	var holidays []holiday
