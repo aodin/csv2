@@ -68,4 +68,24 @@ type holiday struct {
 }
 ```
 
+It can also write slices of structs to an output, including a header row derived from struct field names!
+
+```go
+f, err := os.OpenFile("out.csv", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+if err != nil {
+    panic(err)
+}
+defer f.Close()
+
+writer := csv.NewWriter(f)
+writer.WriteHeader(&countries)
+writer.Marshal(&countries)
+```
+
+The previous code will output:
+
+    Id,Name,Abbrev
+    1,United States,US
+    2,Canada,CA
+
 aodin, 2014

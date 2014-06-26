@@ -60,7 +60,7 @@ func setLayout(v reflect.Type) map[int]string {
 	return layout
 }
 
-// Reader wraps the csv.Reader and adds a map of csv struct tags
+// Reader wraps the csv.Reader and adds a map of csv struct tags.
 type Reader struct {
 	*csv.Reader
 	layout map[int]string
@@ -113,7 +113,7 @@ func (r *Reader) Unmarshal(i interface{}) error {
 	return nil
 }
 
-// UnmarshalOne rads a single row of the Reader into the given struct.
+// UnmarshalOne reads a single row of the Reader into the given struct.
 // The destination interface must of pointer of type struct.
 func (r *Reader) UnmarshalOne(i interface{}) error {
 	// Get the value of the given interface
@@ -140,7 +140,7 @@ func (r *Reader) UnmarshalOne(i interface{}) error {
 }
 
 // Set the values of the given struct with the reflect package.
-// Fields are processed in
+// Fields are processed in sequential order.
 func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 	// TODO wrap the errors with the current field
 	for i := 0; i < elem.NumField(); i += 1 {
@@ -205,7 +205,7 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 	return nil
 }
 
-// NewReader returns a new csv2 Reader by wrapping a csv.Reader
+// NewReader returns a new csv2 Reader by wrapping a csv Reader.
 func NewReader(r io.Reader) *Reader {
 	return &Reader{Reader: csv.NewReader(r)}
 }
@@ -217,7 +217,7 @@ type Writer struct {
 }
 
 // WriteHeader will write the names of the underlying struct fields as a row.
-// It accepts a struct or a slice of structs
+// It accepts a struct or a slice of structs.
 func (w *Writer) WriteHeader(i interface{}) error {
 	headers, err := GetFieldNames(i)
 	if err != nil {
@@ -311,7 +311,7 @@ func (w *Writer) Marshal(i interface{}) error {
 	return nil
 }
 
-// NewWriter returns a new csv2 Writer by wrapping a csv.Writer
+// NewWriter returns a new csv2 Writer by wrapping a csv Writer.
 func NewWriter(r io.Writer) *Writer {
 	return &Writer{Writer: csv.NewWriter(r)}
 }
