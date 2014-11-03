@@ -21,13 +21,13 @@ import (
 )
 
 type Country struct {
-    Id     int64
+    ID     int64
     Name   string
     Abbrev string
 }
 
 func (c Country) String() string {
-    return fmt.Sprintf("%d: %s", c.Id, c.Name)
+    return fmt.Sprintf("%d: %s", c.ID, c.Name)
 }
 
 func main() {
@@ -84,7 +84,7 @@ writer.Marshal(&countries)
 
 The previous code will output:
 
-    Id,Name,Abbrev
+    ID,Name,Abbrev
     1,United States,US
     2,Canada,CA
 
