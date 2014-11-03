@@ -20,8 +20,6 @@ var (
 // GetFieldNames returns a string array of the given interface's field names
 // if the given interface is a struct or slice of structs
 func GetFieldNames(i interface{}) ([]string, error) {
-	// Given interface must be a struct or a slice of structs
-	// TODO Pointers!?
 	value := reflect.Indirect(reflect.ValueOf(i))
 	var elem reflect.Type
 	switch value.Kind() {
@@ -38,6 +36,7 @@ func GetFieldNames(i interface{}) ([]string, error) {
 	default:
 		return nil, ErrUnwritable
 	}
+
 	// Get the names of the struct fields
 	fields := make([]string, elem.NumField())
 	for index := 0; index < elem.NumField(); index += 1 {
@@ -141,6 +140,8 @@ func (r *Reader) UnmarshalOne(i interface{}) error {
 
 // Set the values of the given struct with the reflect package.
 // Fields are processed in sequential order.
+// TODO Each field setter should be separate func to allow pointer calls
+// and non-duplicated behavior
 func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 	// TODO wrap the errors with the current field
 	for i := 0; i < elem.NumField(); i += 1 {
@@ -191,6 +192,72 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 			default:
 				return fmt.Errorf(
 					"csv2: unknown destination struct for field %d",
+					i,
+				)
+			}
+		case reflect.Ptr:
+			// If the value is empty, set the field to nil (except for strings)
+			// TODO functions for each reflect type
+			ptrElem := f.Type().Elem()
+			switch ptrElem.Kind() {
+			case reflect.String:
+				// Never set strings to nil, always set to blank
+				v := values[i]
+				f.Set(reflect.ValueOf(&v))
+			case reflect.Int64:
+				// Leave nil if the value is empty
+				// Attempt to convert the value to an int64
+				if values[i] != "" {
+					v, err := strconv.ParseInt(values[i], 10, 64)
+					if err != nil {
+						return err
+					}
+					f.Set(reflect.ValueOf(&v))
+				}
+			case reflect.Float64:
+				// Attempt to convert the value to a float64
+				if values[i] != "" {
+					v, err := strconv.ParseFloat(values[i], 64)
+					if err != nil {
+						return err
+					}
+					f.Set(reflect.ValueOf(&v))
+				}
+			case reflect.Bool:
+				// Attempt to convert the value to a boolean
+				if values[i] != "" {
+					v, err := strconv.ParseBool(values[i])
+					if err != nil {
+						return err
+					}
+					f.Set(reflect.ValueOf(&v))
+				}
+			case reflect.Struct:
+				switch f.Interface().(type) {
+				case *time.Time:
+					// Check if an alternative layout should be used
+					if values[i] != "" {
+						layout := r.layout[i]
+						if layout == "" {
+							layout = time.RFC3339
+						}
+						parsed, err := time.Parse(layout, values[i])
+
+						if err != nil {
+							return err
+						}
+						f.Set(reflect.ValueOf(&parsed))
+					}
+				default:
+					return fmt.Errorf(
+						"csv2: unknown destination struct for field %d",
+						i,
+					)
+				}
+			default:
+				return fmt.Errorf(
+					"csv2: unsupported type %s for field %d",
+					f.Kind(),
 					i,
 				)
 			}
@@ -265,6 +332,8 @@ func (w *Writer) getStrings(elem reflect.Value) ([]string, error) {
 					i,
 				)
 			}
+		case reflect.Ptr:
+
 		default:
 			return output, fmt.Errorf(
 				"csv2: unsupported type %s for field %d",

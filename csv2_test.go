@@ -24,12 +24,25 @@ type country struct {
 	Freedom    bool
 }
 
+var nullExample = []byte(`2,"United States","US",317808000,17.438,1776-07-04T00:00:00Z,true
+,"",,,,,`)
+
+type nullableCountry struct {
+	ID         *int64
+	Name       string
+	Abbrev     string
+	Population *int64
+	GDP        *float64
+	Founded    *time.Time
+	Freedom    *bool
+}
+
 var typedCountries = []country{
 	{2, "United States", "US", 317808000, 17.438, time.Date(1776, 7, 4, 0, 0, 0, 0, time.UTC), true},
 	{3, "Canada", "CA", 35344962, 1.518, time.Date(1867, 7, 1, 0, 0, 0, 0, time.UTC), false},
 }
 
-// Writer ends with a newline
+// Writer ends with a new line
 var expectedCountries = `2,United States,US,317808000,17.438,1776-07-04T00:00:00Z,true
 3,Canada,CA,35344962,1.518,1867-07-01T00:00:00Z,false
 `
@@ -94,6 +107,11 @@ func TestGetFieldNames(t *testing.T) {
 	output, err = GetFieldNames(&[]*country{})
 	assert.Nil(err)
 	assert.Equal(expected, output)
+
+	// Get field names of a struct with pointers
+	output, err = GetFieldNames(nullableCountry{})
+	assert.Nil(err)
+	assert.Equal(expected, output)
 }
 
 func TestSetLayout(t *testing.T) {
@@ -139,6 +157,7 @@ func TestReader_Unmarshal(t *testing.T) {
 		time.Date(1776, time.Month(7), 4, 0, 0, 0, 0, time.UTC),
 		c.Founded,
 	)
+	assert.Equal(17.438, c.GDP)
 	assert.Equal(true, c.Freedom)
 
 	c = countries[1]
@@ -156,6 +175,39 @@ func TestReader_Unmarshal(t *testing.T) {
 	// Not a slice
 	var cx country
 	assert.Equal(ErrNotSlice, r.Unmarshal(&cx))
+
+	// Unmarshal a struct will pointer fields
+	r = NewReader(bytes.NewBuffer(nullExample))
+	var nullableCountries []nullableCountry
+	assert.Nil(r.Unmarshal(&nullableCountries))
+	assert.Equal(2, len(nullableCountries))
+
+	var nc nullableCountry
+	nc = nullableCountries[0]
+	assert.Equal("United States", nc.Name)
+	assert.Equal("US", nc.Abbrev)
+	assert.Equal(2, *nc.ID)
+	assert.Equal(
+		time.Date(1776, time.Month(7), 4, 0, 0, 0, 0, time.UTC),
+		*nc.Founded,
+	)
+	assert.Equal(17.438, *nc.GDP)
+	assert.Equal(true, *nc.Freedom)
+
+	nc = nullableCountries[1]
+	assert.Equal("", nc.Name)
+	assert.Equal("", nc.Abbrev)
+	var nilInt64 *int64 = nil
+	assert.Equal(nilInt64, nc.ID)
+
+	var nilTime *time.Time = nil
+	assert.Equal(nilTime, nc.Founded)
+
+	var nilFloat64 *float64 = nil
+	assert.Equal(nilFloat64, nc.GDP)
+
+	var nilBool *bool = nil
+	assert.Equal(nilBool, nc.Freedom)
 }
 
 func TestReader_UnmarshalOne(t *testing.T) {
