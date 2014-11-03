@@ -43,7 +43,8 @@ var typedCountries = []country{
 }
 
 // Writer ends with a new line
-var expectedCountries = `2,United States,US,317808000,17.438,1776-07-04T00:00:00Z,true
+var expectedCountries = `ID,Name,Abbrev,Population,GDP,Founded,Freedom
+2,United States,US,317808000,17.438,1776-07-04T00:00:00Z,true
 3,Canada,CA,35344962,1.518,1867-07-01T00:00:00Z,false
 `
 
@@ -62,6 +63,17 @@ type holiday struct {
 
 func (h holiday) String() string {
 	return fmt.Sprintf("%s (%s)", h.Name, h.Day.Format("01-02"))
+}
+
+// Unsupported destination types
+type badHoliday struct {
+	Name []byte
+	Day  time.Time `csv:"Jan _2"`
+}
+
+type badHolidayPointer struct {
+	Name *[]byte
+	Day  time.Time `csv:"Jan _2"`
 }
 
 func TestGetFieldNames(t *testing.T) {
@@ -112,6 +124,15 @@ func TestGetFieldNames(t *testing.T) {
 	output, err = GetFieldNames(nullableCountry{})
 	assert.Nil(err)
 	assert.Equal(expected, output)
+
+	// Attempt to get field names of unsupported types
+	var i int
+	_, err = GetFieldNames(i)
+	assert.Equal(ErrUnwritable, err)
+
+	var is []int64
+	_, err = GetFieldNames(is)
+	assert.Equal(ErrUnwritable, err)
 }
 
 func TestSetLayout(t *testing.T) {
@@ -165,17 +186,6 @@ func TestReader_Unmarshal(t *testing.T) {
 	assert.Equal("CA", c.Abbrev)
 	assert.Equal(3, c.ID)
 
-	// Pass some bad destinations
-	r = NewReader(bytes.NewBuffer(example))
-
-	// Not a pointer
-	var cs []country
-	assert.Equal(ErrNotPointer, r.Unmarshal(cs))
-
-	// Not a slice
-	var cx country
-	assert.Equal(ErrNotSlice, r.Unmarshal(&cx))
-
 	// Unmarshal a struct will pointer fields
 	r = NewReader(bytes.NewBuffer(nullExample))
 	var nullableCountries []nullableCountry
@@ -208,6 +218,30 @@ func TestReader_Unmarshal(t *testing.T) {
 
 	var nilBool *bool = nil
 	assert.Equal(nilBool, nc.Freedom)
+
+	// Pass some bad destinations
+	r = NewReader(bytes.NewBuffer(example))
+
+	// Not a pointer
+	var cs []country
+	assert.Equal(ErrNotPointer, r.Unmarshal(cs))
+
+	// Not a slice
+	var cx country
+	assert.Equal(ErrNotSlice, r.Unmarshal(&cx))
+
+	// Slice, but not a slice of structs
+	var is []int64
+	assert.Equal(ErrNotSlice, r.Unmarshal(&is))
+
+	// Test unsupported field types
+	r = NewReader(bytes.NewBuffer(exampleHolidays))
+
+	var badHolidays []badHoliday
+	assert.NotNil(r.Unmarshal(&badHolidays))
+
+	var badHolidayPointers []badHolidayPointer
+	assert.NotNil(r.Unmarshal(&badHolidayPointers))
 }
 
 func TestReader_UnmarshalOne(t *testing.T) {
@@ -242,7 +276,7 @@ func TestReader_UnmarshalOne(t *testing.T) {
 	assert.Equal(ErrNotStruct, r.UnmarshalOne(&i))
 }
 
-func TestWriter_Marshal(t *testing.T) {
+func TestWriter(t *testing.T) {
 	assert := assert.New(t)
 
 	// Create a buffer with CSV format and a new csv2 writer
@@ -251,6 +285,7 @@ func TestWriter_Marshal(t *testing.T) {
 	w = NewWriter(&b)
 
 	// Marshal the countries array
+	assert.Nil(w.WriteHeader(&typedCountries))
 	assert.Nil(w.Marshal(&typedCountries))
 	assert.Equal(expectedCountries, b.String())
 }
