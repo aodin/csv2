@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var example = []byte(`ID,NAME,ABBREV,POPULATION,GDP (trillions),FOUNDED,FREEDOM?
@@ -13,7 +15,7 @@ var example = []byte(`ID,NAME,ABBREV,POPULATION,GDP (trillions),FOUNDED,FREEDOM?
 3,"Canada","CA",35344962,1.518,1867-07-01T00:00:00Z,false`)
 
 type country struct {
-	Id         int64
+	ID         int64
 	Name       string
 	Abbrev     string
 	Population int64
@@ -33,7 +35,7 @@ var expectedCountries = `2,United States,US,317808000,17.438,1776-07-04T00:00:00
 `
 
 func (c country) String() string {
-	return fmt.Sprintf("%s, %s, (%d)", c.Name, c.Abbrev, c.Id)
+	return fmt.Sprintf("%s, %s, (%d)", c.Name, c.Abbrev, c.ID)
 }
 
 var exampleHolidays = []byte(`Fourth of July,Jul 4
@@ -49,39 +51,10 @@ func (h holiday) String() string {
 	return fmt.Sprintf("%s (%s)", h.Name, h.Day.Format("01-02"))
 }
 
-func expectString(t *testing.T, a, b string) {
-	if a != b {
-		t.Errorf("Unexpected string: %s != %s", a, b)
-	}
-}
-
-func expectInt64(t *testing.T, a, b int64) {
-	if a != b {
-		t.Errorf("Unexpected integer: %d != %d", a, b)
-	}
-}
-
-func expectDate(t *testing.T, a, b time.Time) {
-	if a != b {
-		t.Errorf("Unexpected date: %s != %s", a, b)
-	}
-}
-
-func expectStringArray(t *testing.T, a, b []string) {
-	if len(a) != len(b) {
-		t.Errorf("Unequal lengths of string arrays: %d != %d", len(a), len(b))
-		return
-	}
-	for i, elem := range a {
-		if elem != b[i] {
-			t.Errorf("Unequal string element at %d: %s != %s", i, elem, b[i])
-		}
-	}
-}
-
 func TestGetFieldNames(t *testing.T) {
+	assert := assert.New(t)
 	expected := []string{
-		"Id",
+		"ID",
 		"Name",
 		"Abbrev",
 		"Population",
@@ -92,182 +65,140 @@ func TestGetFieldNames(t *testing.T) {
 	var output []string
 	var err error
 
-	// struct
+	// Struct
 	output, err = GetFieldNames(country{})
-	if err != nil {
-		t.Errorf("Error during GetFieldNames of struct: %s", err)
-	}
-	expectStringArray(t, output, expected)
+	assert.Nil(err)
+	assert.Equal(expected, output)
 
-	// struct pointer
+	// Struct pointer
 	output, err = GetFieldNames(&country{})
-	if err != nil {
-		t.Errorf("Error during GetFieldNames of struct pointer: %s", err)
-	}
-	expectStringArray(t, output, expected)
+	assert.Nil(err)
+	assert.Equal(expected, output)
 
-	// slice
+	// Slice
 	output, err = GetFieldNames([]country{})
-	if err != nil {
-		t.Errorf("Error during GetFieldNames of slice: %s", err)
-	}
-	expectStringArray(t, output, expected)
+	assert.Nil(err)
+	assert.Equal(expected, output)
 
 	// pointer to slice
 	output, err = GetFieldNames(&[]country{})
-	if err != nil {
-		t.Errorf("Error during GetFieldNames of pointer to slice: %s", err)
-	}
-	expectStringArray(t, output, expected)
+	assert.Nil(err)
+	assert.Equal(expected, output)
 
 	// slice of pointers
 	output, err = GetFieldNames([]*country{})
-	if err != nil {
-		t.Errorf("Error during GetFieldNames of slice of struct pointers: %s", err)
-	}
-	expectStringArray(t, output, expected)
+	assert.Nil(err)
+	assert.Equal(expected, output)
 
 	// slice of pointers
 	output, err = GetFieldNames(&[]*country{})
-	if err != nil {
-		t.Errorf("Error during GetFieldNames of pointer to slice of struct pointers: %s", err)
-	}
-	expectStringArray(t, output, expected)
+	assert.Nil(err)
+	assert.Equal(expected, output)
 }
 
 func TestSetLayout(t *testing.T) {
+	assert := assert.New(t)
+
 	// Create a buffer with CSV format and a new csv2 reader
 	r := NewReader(bytes.NewBuffer(exampleHolidays))
 
 	var h holiday
 
 	// Set the layouts
-	typ := reflect.TypeOf(h)
-	if typ.Kind() != reflect.Ptr {
-		typ = reflect.PtrTo(typ)
-	}
-	layout := setLayout(typ.Elem())
-	if len(layout) != 1 {
-		t.Fatalf("Unexpected length of layouts: %d != 1", len(r.layout))
-	}
-	expectString(t, layout[1], "Jan _2")
+	layout := setLayout(reflect.PtrTo(reflect.TypeOf(h)).Elem())
+	assert.Equal(1, len(layout))
+	assert.Equal("Jan _2", layout[1])
 
 	// Also try with an array
 	var holidays []holiday
-	err := r.Unmarshal(&holidays)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(holidays) != 3 {
-		t.Fatalf("Unexpected length of holidays: %d != 2", len(holidays))
-	}
-	expectString(t, holidays[0].String(), "Fourth of July (07-04)")
+	assert.Nil(r.Unmarshal(&holidays))
+	assert.Equal(3, len(holidays))
+	assert.Equal("Fourth of July (07-04)", holidays[0].String())
 }
 
 func TestReader_Unmarshal(t *testing.T) {
+	assert := assert.New(t)
+
 	// Create a buffer with CSV format and a new csv2 reader
 	r := NewReader(bytes.NewBuffer(example))
 
 	// Get rid of the header
 	_, err := r.Read()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(err)
 
 	// Unmarshal the whole file
 	var countries []country
-	err = r.Unmarshal(&countries)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(countries) != 2 {
-		t.Fatalf("Unexpected length of countries array: %d != %d", len(countries), 2)
-	}
+	assert.Nil(r.Unmarshal(&countries))
+	assert.Equal(2, len(countries))
 
 	c := countries[0]
-	expectString(t, c.Name, "United States")
-	expectString(t, c.Abbrev, "US")
-	expectInt64(t, c.Id, 2)
-
-	july4 := time.Date(1776, time.Month(7), 4, 0, 0, 0, 0, time.UTC)
-	expectDate(t, c.Founded, july4)
-	if !c.Freedom {
-		t.Errorf("Unexpected boolean: false != true")
-	}
+	assert.Equal("United States", c.Name)
+	assert.Equal("US", c.Abbrev)
+	assert.Equal(2, c.ID)
+	assert.Equal(
+		time.Date(1776, time.Month(7), 4, 0, 0, 0, 0, time.UTC),
+		c.Founded,
+	)
+	assert.Equal(true, c.Freedom)
 
 	c = countries[1]
-	expectString(t, c.Name, "Canada")
-	expectString(t, c.Abbrev, "CA")
-	expectInt64(t, c.Id, 3)
+	assert.Equal("Canada", c.Name)
+	assert.Equal("CA", c.Abbrev)
+	assert.Equal(3, c.ID)
 
 	// Pass some bad destinations
 	r = NewReader(bytes.NewBuffer(example))
 
 	// Not a pointer
 	var cs []country
-	if r.Unmarshal(cs) != ErrNotPointer {
-		t.Error("Did not receive a non-pointer error during Unmarshal")
-	}
+	assert.Equal(ErrNotPointer, r.Unmarshal(cs))
 
 	// Not a slice
 	var cx country
-	if r.Unmarshal(&cx) != ErrNotSlice {
-		t.Fatal("Did not receive a non-slice error during Unmarshal")
-	}
+	assert.Equal(ErrNotSlice, r.Unmarshal(&cx))
 }
 
 func TestReader_UnmarshalOne(t *testing.T) {
+	assert := assert.New(t)
+
 	// Create a buffer with CSV format and a new csv2 reader
 	r := NewReader(bytes.NewBuffer(example))
 
 	// Get rid of the header
 	_, err := r.Read()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(err)
 
 	// Unmarshal one row
 	var c country
-	err = r.UnmarshalOne(&c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	expectString(t, c.Name, "United States")
-	expectString(t, c.Abbrev, "US")
-	expectInt64(t, c.Id, 2)
+	assert.Nil(r.UnmarshalOne(&c))
+	assert.Equal("United States", c.Name)
+	assert.Equal("US", c.Abbrev)
+	assert.Equal(2, c.ID)
+	assert.Equal(
+		time.Date(1776, time.Month(7), 4, 0, 0, 0, 0, time.UTC),
+		c.Founded,
+	)
 
 	// Pass some bad destinations
 	r = NewReader(bytes.NewBuffer(example))
 
 	// Not a pointer
-	if r.UnmarshalOne(c) != ErrNotPointer {
-		t.Error("Did not receive a non-pointer error during UnmarshalOne")
-	}
+	assert.Equal(ErrNotPointer, r.UnmarshalOne(c))
 
 	// Not a struct
 	var i int
-	if r.UnmarshalOne(&i) != ErrNotStruct {
-		t.Fatal("Did not receive a non-struct error during UnmarshalOne")
-	}
+	assert.Equal(ErrNotStruct, r.UnmarshalOne(&i))
 }
 
 func TestWriter_Marshal(t *testing.T) {
+	assert := assert.New(t)
+
 	// Create a buffer with CSV format and a new csv2 writer
-	var err error
 	var b bytes.Buffer
 	var w *Writer
 	w = NewWriter(&b)
 
 	// Marshal the countries array
-	err = w.Marshal(&typedCountries)
-	if err != nil {
-		t.Fatalf("Error during Writer.Marshal: %s", err)
-	}
-	if b.String() != expectedCountries {
-		t.Errorf("Unexpected string output of writer: %s", b.String())
-	}
-
-	// Reset the buffer and Writer
+	assert.Nil(w.Marshal(&typedCountries))
+	assert.Equal(expectedCountries, b.String())
 }
