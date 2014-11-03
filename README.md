@@ -1,23 +1,28 @@
 csv2
 ====
 
-Adds schema to Go's `encoding/csv` package.
+Parse `csv` files directly into `struct` instances.
 
-Given a csv file:
+[![Build Status](https://travis-ci.org/aodin/csv2.svg)](https://travis-ci.org/aodin/csv2)
+
+
+Quickstart
+----------
+
+Parse the `csv` file:
 
     ID,NAME,ABBREV
     1,"United States",US
     2,"Canada",CA
-
-It can be parsed using:
 
 ```go
 package main
 
 import (
     "fmt"
-    "github.com/aodin/csv2" // Will import as csv!
     "os"
+
+    "github.com/aodin/csv2" // Will import as csv!
 )
 
 type Country struct {
@@ -38,21 +43,23 @@ func main() {
     csvf := csv.NewReader(f)
 
     // Discard the header
-    _, err = csvf.Read()
-    if err != nil {
+    if _, err = csvf.Read(); err != nil {
         panic(err)
     }
 
     var countries []Country
-    err = csvf.Unmarshal(&countries)
-    if err != nil {
+    if err = csvf.Unmarshal(&countries); err != nil {
         panic(err)
     }
     fmt.Println(countries)
 }
 ```
 
+Destination Types
+-----------------
+
 Supported field types for destination structs include:
+
 * `string`
 * `int64`
 * `float64`
@@ -68,7 +75,18 @@ type holiday struct {
 }
 ```
 
-It can also write slices of structs to an output, including a header row derived from struct field names!
+When a `csv` column is empty, the types above will error. You will want to use a pointer type, which will be set to `nil` when there is no content:
+
+* `*int64`
+* `*float64`
+* `*bool`
+* `*time.Time`
+
+
+Writer
+------
+
+The package can also write slices of structs to an output, including a header row derived from struct field names!
 
 ```go
 f, err := os.OpenFile("out.csv", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
@@ -82,10 +100,11 @@ writer.WriteHeader(&countries)
 writer.Marshal(&countries)
 ```
 
-The previous code will output:
-
     ID,Name,Abbrev
     1,United States,US
     2,Canada,CA
+
+
+Happy Hacking!
 
 aodin, 2014
