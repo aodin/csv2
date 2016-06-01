@@ -161,6 +161,13 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 				return err
 			}
 			f.SetInt(v)
+		case reflect.Uint64:
+			// Attempt to convert the value to an uint64
+			v, err := strconv.ParseUint(values[i], 10, 64)
+			if err != nil {
+				return err
+			}
+			f.SetUint(v)
 		case reflect.Float64:
 			// Attempt to convert the value to a float64
 			v, err := strconv.ParseFloat(values[i], 64)
@@ -209,6 +216,16 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 				// Attempt to convert the value to an int64
 				if values[i] != "" {
 					v, err := strconv.ParseInt(values[i], 10, 64)
+					if err != nil {
+						return err
+					}
+					f.Set(reflect.ValueOf(&v))
+				}
+			case reflect.Uint64:
+				// Leave nil if the value is empty
+				// Attempt to convert the value to an uint64
+				if values[i] != "" {
+					v, err := strconv.ParseUint(values[i], 10, 64)
 					if err != nil {
 						return err
 					}

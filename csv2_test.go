@@ -173,7 +173,7 @@ func TestReader_Unmarshal(t *testing.T) {
 	c := countries[0]
 	assert.Equal("United States", c.Name)
 	assert.Equal("US", c.Abbrev)
-	assert.Equal(2, c.ID)
+	assert.EqualValues(2, c.ID)
 	assert.Equal(
 		time.Date(1776, time.Month(7), 4, 0, 0, 0, 0, time.UTC),
 		c.Founded,
@@ -184,7 +184,7 @@ func TestReader_Unmarshal(t *testing.T) {
 	c = countries[1]
 	assert.Equal("Canada", c.Name)
 	assert.Equal("CA", c.Abbrev)
-	assert.Equal(3, c.ID)
+	assert.EqualValues(3, c.ID)
 
 	// Unmarshal a struct will pointer fields
 	r = NewReader(bytes.NewBuffer(nullExample))
@@ -196,7 +196,7 @@ func TestReader_Unmarshal(t *testing.T) {
 	nc = nullableCountries[0]
 	assert.Equal("United States", nc.Name)
 	assert.Equal("US", nc.Abbrev)
-	assert.Equal(2, *nc.ID)
+	assert.EqualValues(2, *nc.ID)
 	assert.Equal(
 		time.Date(1776, time.Month(7), 4, 0, 0, 0, 0, time.UTC),
 		*nc.Founded,
@@ -259,7 +259,7 @@ func TestReader_UnmarshalOne(t *testing.T) {
 	assert.Nil(r.UnmarshalOne(&c))
 	assert.Equal("United States", c.Name)
 	assert.Equal("US", c.Abbrev)
-	assert.Equal(2, c.ID)
+	assert.EqualValues(2, c.ID)
 	assert.Equal(
 		time.Date(1776, time.Month(7), 4, 0, 0, 0, 0, time.UTC),
 		c.Founded,
