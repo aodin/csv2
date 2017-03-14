@@ -154,7 +154,7 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 		switch f.Kind() {
 		case reflect.String:
 			f.SetString(values[i])
-		case reflect.Int64:
+		case reflect.Int64, reflect.Int:
 			// Attempt to convert the value to an int64
 			v, err := strconv.ParseInt(values[i], 10, 64)
 			if err != nil {
@@ -216,6 +216,16 @@ func (r *Reader) setValue(values []string, elem *reflect.Value) error {
 				// Attempt to convert the value to an int64
 				if values[i] != "" {
 					v, err := strconv.ParseInt(values[i], 10, 64)
+					if err != nil {
+						return err
+					}
+					f.Set(reflect.ValueOf(&v))
+				}
+			case reflect.Int:
+				// Leave nil if the value is empty
+				// Attempt to convert the value to an int
+				if values[i] != "" {
+					v, err := strconv.Atoi(values[i])
 					if err != nil {
 						return err
 					}
@@ -322,7 +332,7 @@ func (w *Writer) getStrings(elem reflect.Value) ([]string, error) {
 		switch f.Kind() {
 		case reflect.String:
 			output[i] = f.String()
-		case reflect.Int64:
+		case reflect.Int64, reflect.Int:
 			// TODO additional base output
 			output[i] = strconv.FormatInt(f.Int(), 10)
 		case reflect.Uint64:

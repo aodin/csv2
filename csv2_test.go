@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var example = []byte(`ID,NAME,ABBREV,POPULATION,GDP (trillions),FOUNDED,FREEDOM?
-2,"United States","US",317808000,17.438,1776-07-04T00:00:00Z,true
-3,"Canada","CA",35344962,1.518,1867-07-01T00:00:00Z,false`)
+var example = []byte(`ID,NAME,ABBREV,POPULATION,GDP (trillions),FOUNDED,FREEDOM?,HDI
+2,"United States","US",317808000,17.438,1776-07-04T00:00:00Z,true,-30
+3,"Canada","CA",35344962,1.518,1867-07-01T00:00:00Z,false,40`)
 
 type country struct {
 	ID         int64
@@ -22,10 +22,11 @@ type country struct {
 	GDP        float64
 	Founded    time.Time
 	Freedom    bool
+	HDI        int
 }
 
-var nullExample = []byte(`2,"United States","US",317808000,17.438,1776-07-04T00:00:00Z,true
-,"",,,,,`)
+var nullExample = []byte(`2,"United States","US",317808000,17.438,1776-07-04T00:00:00Z,true,-30
+,"",,,,,,`)
 
 type nullableCountry struct {
 	ID         *int64
@@ -35,17 +36,18 @@ type nullableCountry struct {
 	GDP        *float64
 	Founded    *time.Time
 	Freedom    *bool
+	HDI        *int
 }
 
 var typedCountries = []country{
-	{2, "United States", "US", 317808000, 17.438, time.Date(1776, 7, 4, 0, 0, 0, 0, time.UTC), true},
-	{3, "Canada", "CA", 35344962, 1.518, time.Date(1867, 7, 1, 0, 0, 0, 0, time.UTC), false},
+	{2, "United States", "US", 317808000, 17.438, time.Date(1776, 7, 4, 0, 0, 0, 0, time.UTC), true, -30},
+	{3, "Canada", "CA", 35344962, 1.518, time.Date(1867, 7, 1, 0, 0, 0, 0, time.UTC), false, 40},
 }
 
 // Writer ends with a new line
-var expectedCountries = `ID,Name,Abbrev,Population,GDP,Founded,Freedom
-2,United States,US,317808000,17.438,1776-07-04T00:00:00Z,true
-3,Canada,CA,35344962,1.518,1867-07-01T00:00:00Z,false
+var expectedCountries = `ID,Name,Abbrev,Population,GDP,Founded,Freedom,HDI
+2,United States,US,317808000,17.438,1776-07-04T00:00:00Z,true,-30
+3,Canada,CA,35344962,1.518,1867-07-01T00:00:00Z,false,40
 `
 
 func (c country) String() string {
@@ -86,6 +88,7 @@ func TestGetFieldNames(t *testing.T) {
 		"GDP",
 		"Founded",
 		"Freedom",
+		"HDI",
 	}
 	var output []string
 	var err error
@@ -180,11 +183,13 @@ func TestReader_Unmarshal(t *testing.T) {
 	)
 	assert.Equal(17.438, c.GDP)
 	assert.Equal(true, c.Freedom)
+	assert.EqualValues(-30, c.HDI)
 
 	c = countries[1]
 	assert.Equal("Canada", c.Name)
 	assert.Equal("CA", c.Abbrev)
 	assert.EqualValues(3, c.ID)
+	assert.EqualValues(40, c.HDI)
 
 	// Unmarshal a struct will pointer fields
 	r = NewReader(bytes.NewBuffer(nullExample))
@@ -203,6 +208,7 @@ func TestReader_Unmarshal(t *testing.T) {
 	)
 	assert.Equal(17.438, *nc.GDP)
 	assert.Equal(true, *nc.Freedom)
+	assert.EqualValues(-30, *nc.HDI)
 
 	nc = nullableCountries[1]
 	assert.Equal("", nc.Name)
