@@ -18,7 +18,7 @@ type country struct {
 	ID         int64
 	Name       string
 	Abbrev     string
-	Population int64
+	Population uint64
 	GDP        float64
 	Founded    time.Time
 	Freedom    bool
@@ -31,7 +31,7 @@ type nullableCountry struct {
 	ID         *int64
 	Name       string
 	Abbrev     string
-	Population *int64
+	Population *uint64
 	GDP        *float64
 	Founded    *time.Time
 	Freedom    *bool

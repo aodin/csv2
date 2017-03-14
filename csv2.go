@@ -325,6 +325,9 @@ func (w *Writer) getStrings(elem reflect.Value) ([]string, error) {
 		case reflect.Int64:
 			// TODO additional base output
 			output[i] = strconv.FormatInt(f.Int(), 10)
+		case reflect.Uint64:
+			// TODO additional base output
+			output[i] = strconv.FormatUint(f.Uint(), 10)
 		case reflect.Float64:
 			// TODO additional formats, precision
 			output[i] = strconv.FormatFloat(f.Float(), 'f', -1, 64)
@@ -350,7 +353,7 @@ func (w *Writer) getStrings(elem reflect.Value) ([]string, error) {
 				)
 			}
 		case reflect.Ptr:
-
+			fallthrough
 		default:
 			return output, fmt.Errorf(
 				"csv2: unsupported type %s for field %d",
